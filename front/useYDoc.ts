@@ -55,7 +55,16 @@ export function useYDoc(pageId: string) {
 
   const updateBlock = (blockId: string, content: string) => {
     if (!blocksMapRef.current) return;
-    blocksMapRef.current.set(blockId, { content, updatedAt: Date.now() });
+    const existingBlock = blocksMapRef.current.get(blockId);
+    if (existingBlock) {
+      blocksMapRef.current.set(blockId, {
+        id: blockId,
+        type: existingBlock.type,
+        content,
+        position: existingBlock.position,
+        updatedAt: Date.now(),
+      });
+    }
   };
 
   const getBlocks = (): Block[] => {
@@ -74,7 +83,12 @@ export function useYDoc(pageId: string) {
 
   const addBlock = (block: Block) => {
     if (!blocksMapRef.current) return;
-    blocksMapRef.current.set(block.id, block);
+    blocksMapRef.current.set(block.id, {
+      id: block.id,
+      type: block.type,
+      content: block.content,
+      position: block.position,
+    });
   };
 
   const deleteBlock = (blockId: string) => {

@@ -10,6 +10,10 @@ interface BlockProps {
   onTypeChange?: (type: "text" | "code" | "table") => void;
 }
 
+interface TableData {
+  rows: string[][];
+}
+
 export function TextBlock({
   block,
   onUpdate,
@@ -17,25 +21,42 @@ export function TextBlock({
   onFocus,
   onTypeChange,
 }: BlockProps) {
-  const [content, setContent] = useState(block.content);
-  const [showCommandMenu, setShowCommandMenu] = useState(false);
-  const [commandMenuPosition, setCommandMenuPosition] = useState({
-    x: 0,
-    y: 0,
-  });
+  const [showCommandMenu, setShowCommandMenu] = useState<boolean>(false);
+  const [commandMenuPosition, setCommandMenuPosition] = useState<{
+    x: number;
+    y: number;
+  }>({ x: 0, y: 0 });
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (ref.current && content !== block.content) {
-      setContent(block.content);
-      ref.current.textContent = block.content;
+    if (ref.current && block.content !== (ref.current.textContent || "")) {
+      updateDisplayContent(block.content);
     }
   }, [block.content]);
 
-  const handleInput = () => {
+  const updateDisplayContent = (text: string): void => {
+    if (!ref.current) return;
+
+    if (text.startsWith("# ")) {
+      ref.current.innerHTML = `<h1 class="text-3xl font-bold">${text.slice(
+        2
+      )}</h1>`;
+    } else if (text.startsWith("## ")) {
+      ref.current.innerHTML = `<h2 class="text-2xl font-bold">${text.slice(
+        3
+      )}</h2>`;
+    } else if (text.startsWith("### ")) {
+      ref.current.innerHTML = `<h3 class="text-xl font-bold">${text.slice(
+        4
+      )}</h3>`;
+    } else {
+      ref.current.textContent = text;
+    }
+  };
+
+  const handleInput = (): void => {
     if (!ref.current) return;
     const newContent = ref.current.textContent || "";
-    setContent(newContent);
 
     if (newContent === "/") {
       const rect = ref.current.getBoundingClientRect();
@@ -51,7 +72,7 @@ export function TextBlock({
     onUpdate(newContent);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent): void => {
     if (showCommandMenu) {
       if (["ArrowUp", "ArrowDown", "Enter", "Escape"].includes(e.key)) {
         return;
@@ -76,13 +97,14 @@ export function TextBlock({
     onKeyDown(e);
   };
 
-  const handleCommandSelect = (type: "text" | "code" | "table") => {
+  const handleCommandSelect = (type: "text" | "code" | "table"): void => {
     if (ref.current) {
       ref.current.textContent = "";
     }
-    setContent("");
     setShowCommandMenu(false);
-    onTypeChange?.(type);
+    if (onTypeChange) {
+      onTypeChange(type);
+    }
   };
 
   return (
@@ -109,14 +131,16 @@ export function TextBlock({
 }
 
 export function CodeBlock({ block, onUpdate, onKeyDown, onFocus }: BlockProps) {
-  const [content, setContent] = useState(block.content);
+  const [content, setContent] = useState<string>(block.content);
   const ref = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    setContent(block.content);
+    if (content !== block.content) {
+      setContent(block.content);
+    }
   }, [block.content]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>): void => {
     const newContent = e.target.value;
     setContent(newContent);
     onUpdate(newContent);
@@ -124,7 +148,7 @@ export function CodeBlock({ block, onUpdate, onKeyDown, onFocus }: BlockProps) {
 
   return (
     <div className="relative group">
-      <div className="absolute top-2 right-2 text-xs text-gray-400 bg-gray-800 px-2 py-1 rounded">
+      <div className="absolute top-2 right-2 text-xs text-gray-400 bg-gray-800 px-2 py-1 rounded z-10">
         Code
       </div>
       <textarea
@@ -147,9 +171,11 @@ export function TableBlock({
   onKeyDown,
   onFocus,
 }: BlockProps) {
-  const [tableData, setTableData] = useState(() => {
+  const [tableData, setTableData] = useState<TableData>(() => {
     try {
-      return JSON.parse(block.content || '{"rows":[["",""],["",""]]}');
+      return JSON.parse(
+        block.content || '{"rows":[["",""],["",""]]}'
+      ) as TableData;
     } catch {
       return {
         rows: [
@@ -162,73 +188,137 @@ export function TableBlock({
 
   useEffect(() => {
     try {
-      const parsed = JSON.parse(block.content || '{"rows":[["",""],["",""]]}');
-      setTableData(parsed);
+      const parsed = JSON.parse(
+        block.content || '{"rows":[["",""],["",""]]}'
+      ) as TableData;
+      if (JSON.stringify(parsed) !== JSON.stringify(tableData)) {
+        setTableData(parsed);
+      }
     } catch {
-      setTableData({
+      const defaultData = {
         rows: [
           ["", ""],
           ["", ""],
         ],
-      });
+      };
+      if (JSON.stringify(defaultData) !== JSON.stringify(tableData)) {
+        setTableData(defaultData);
+      }
     }
   }, [block.content]);
 
-  const updateCell = (rowIndex: number, colIndex: number, value: string) => {
-    const newTableData = { ...tableData };
-    newTableData.rows[rowIndex][colIndex] = value;
+  const updateCell = (
+    rowIndex: number,
+    colIndex: number,
+    value: string
+  ): void => {
+    const newTableData: TableData = {
+      rows: tableData.rows.map((row, rIdx) =>
+        rIdx === rowIndex
+          ? row.map((cell, cIdx) => (cIdx === colIndex ? value : cell))
+          : [...row]
+      ),
+    };
     setTableData(newTableData);
     onUpdate(JSON.stringify(newTableData));
   };
 
-  const addRow = () => {
-    const newTableData = { ...tableData };
+  const addRow = (): void => {
+    const newTableData: TableData = { ...tableData };
     const colCount = newTableData.rows[0]?.length || 2;
     newTableData.rows.push(new Array(colCount).fill(""));
     setTableData(newTableData);
     onUpdate(JSON.stringify(newTableData));
   };
 
-  const addColumn = () => {
-    const newTableData = { ...tableData };
-    newTableData.rows.forEach((row: any) => row.push(""));
+  const addColumn = (): void => {
+    const newTableData: TableData = {
+      rows: tableData.rows.map((row) => [...row, ""]),
+    };
+    setTableData(newTableData);
+    onUpdate(JSON.stringify(newTableData));
+  };
+
+  const deleteRow = (rowIndex: number): void => {
+    if (tableData.rows.length <= 1) return;
+    const newTableData: TableData = {
+      rows: tableData.rows.filter((_, index) => index !== rowIndex),
+    };
+    setTableData(newTableData);
+    onUpdate(JSON.stringify(newTableData));
+  };
+
+  const deleteColumn = (colIndex: number): void => {
+    if (tableData.rows[0]?.length <= 1) return;
+    const newTableData: TableData = {
+      rows: tableData.rows.map((row) =>
+        row.filter((_, index) => index !== colIndex)
+      ),
+    };
     setTableData(newTableData);
     onUpdate(JSON.stringify(newTableData));
   };
 
   return (
     <div className="p-2 rounded hover:bg-gray-50" onFocus={onFocus}>
-      <table className="w-full">
-        <tbody>
-          {tableData.rows.map((row: string[], rowIndex: number) => (
-            <tr key={rowIndex}>
-              {row.map((cell: string, colIndex: number) => (
-                <td key={colIndex} className="border p-2">
-                  <input
-                    type="text"
-                    value={cell}
-                    onChange={(e) =>
-                      updateCell(rowIndex, colIndex, e.target.value)
-                    }
-                    className="w-full outline-none bg-transparent"
-                    placeholder={rowIndex === 0 ? `Column ${colIndex + 1}` : ""}
-                  />
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse">
+          <tbody>
+            {tableData.rows.map((row: string[], rowIndex: number) => (
+              <tr key={rowIndex} className="group">
+                {row.map((cell: string, colIndex: number) => (
+                  <td
+                    key={colIndex}
+                    className="border border-gray-300 p-0 relative"
+                  >
+                    <input
+                      type="text"
+                      value={cell}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                        updateCell(rowIndex, colIndex, e.target.value)
+                      }
+                      className="w-full p-2 outline-none bg-transparent min-w-[100px]"
+                      placeholder={
+                        rowIndex === 0 ? `Column ${colIndex + 1}` : ""
+                      }
+                    />
+                    {colIndex === 0 && (
+                      <button
+                        onClick={() => deleteRow(rowIndex)}
+                        className="absolute -left-6 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 text-red-500 hover:bg-red-50 w-5 h-5 rounded text-xs"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </td>
+                ))}
+              </tr>
+            ))}
+            <tr>
+              {tableData.rows[0]?.map((_: string, colIndex: number) => (
+                <td key={colIndex} className="border-0 p-1 relative">
+                  <button
+                    onClick={() => deleteColumn(colIndex)}
+                    className="w-full opacity-0 hover:opacity-100 text-red-500 hover:bg-red-50 rounded text-xs py-1"
+                  >
+                    ×
+                  </button>
                 </td>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </tbody>
+        </table>
+      </div>
       <div className="flex gap-2 mt-2">
         <button
           onClick={addRow}
-          className="text-sm text-gray-500 hover:text-gray-700 px-2 py-1 rounded hover:bg-gray-100"
+          className="text-sm text-gray-500 hover:text-gray-700 px-3 py-1 rounded hover:bg-gray-100 border border-gray-200"
         >
           + Add Row
         </button>
         <button
           onClick={addColumn}
-          className="text-sm text-gray-500 hover:text-gray-700 px-2 py-1 rounded hover:bg-gray-100"
+          className="text-sm text-gray-500 hover:text-gray-700 px-3 py-1 rounded hover:bg-gray-100 border border-gray-200"
         >
           + Add Column
         </button>

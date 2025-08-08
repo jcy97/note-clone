@@ -33,9 +33,7 @@ export function PageEditor({ pageId }: PageEditorProps) {
 
     const updateBlocks = () => {
       const yjsBlocks = getBlocks();
-      if (yjsBlocks.length > 0) {
-        setBlocks(yjsBlocks);
-      }
+      setBlocks(yjsBlocks);
     };
 
     blocksMap.observe(updateBlocks);
@@ -59,7 +57,6 @@ export function PageEditor({ pageId }: PageEditorProps) {
     try {
       const pageData = await pageApi.getById(pageId);
       setPage(pageData);
-      setBlocks(pageData.blocks);
 
       pageData.blocks.forEach((block) => {
         addBlock(block);
@@ -69,51 +66,51 @@ export function PageEditor({ pageId }: PageEditorProps) {
     }
   };
 
+  const saveToDatabase = useCallback(async () => {
+    if (page && blocks.length > 0) {
+      try {
+        await pageApi.update(pageId, { ...page, blocks });
+      } catch (error) {
+        console.error("Failed to save to database:", error);
+      }
+    }
+  }, [page, pageId, blocks]);
+
   const handleBlockUpdate = useCallback(
     (blockId: string, content: string) => {
       updateBlock(blockId, content);
-
-      setBlocks((prev) =>
-        prev.map((block) =>
-          block.id === blockId ? { ...block, content } : block
-        )
-      );
-
-      if (page) {
-        const updatedBlocks = blocks.map((block) =>
-          block.id === blockId ? { ...block, content } : block
-        );
-        pageApi.update(pageId, { ...page, blocks: updatedBlocks });
-      }
+      saveToDatabase();
     },
-    [updateBlock, blocks, page, pageId]
+    [updateBlock, saveToDatabase]
   );
 
   const handleBlockTypeChange = (
     blockId: string,
     newType: "text" | "code" | "table"
   ) => {
-    const defaultContent =
-      newType === "table" ? '{"rows":[["",""],["",""]]}' : "";
+    let defaultContent = "";
 
-    setBlocks((prev) =>
-      prev.map((block) =>
-        block.id === blockId
-          ? { ...block, type: newType, content: defaultContent }
-          : block
-      )
-    );
-
-    updateBlock(blockId, defaultContent);
-
-    if (page) {
-      const updatedBlocks = blocks.map((block) =>
-        block.id === blockId
-          ? { ...block, type: newType, content: defaultContent }
-          : block
-      );
-      pageApi.update(pageId, { ...page, blocks: updatedBlocks });
+    if (newType === "table") {
+      defaultContent = '{"rows":[["",""],["",""]]}';
+    } else if (newType === "code") {
+      defaultContent = "";
     }
+
+    const currentBlock = blocks.find((b) => b.id === blockId);
+    if (!currentBlock) return;
+
+    const updatedBlock: Block = {
+      ...currentBlock,
+      type: newType,
+      content: defaultContent,
+    };
+
+    addBlock(updatedBlock);
+    saveToDatabase();
+
+    setTimeout(() => {
+      setSelectedBlockId(blockId);
+    }, 100);
   };
 
   const createNewBlock = (
@@ -132,15 +129,11 @@ export function PageEditor({ pageId }: PageEditorProps) {
     newBlocks.splice(afterIndex + 1, 0, newBlock);
     newBlocks.forEach((block, index) => {
       block.position = index;
+      addBlock(block);
     });
 
-    setBlocks(newBlocks);
-    addBlock(newBlock);
     setSelectedBlockId(newBlock.id);
-
-    if (page) {
-      pageApi.update(pageId, { ...page, blocks: newBlocks });
-    }
+    saveToDatabase();
   };
 
   const handleKeyDown = (blockId: string) => (e: React.KeyboardEvent) => {
@@ -161,13 +154,15 @@ export function PageEditor({ pageId }: PageEditorProps) {
         const tableData = {
           rows: [new Array(cols).fill(""), new Array(cols).fill("")],
         };
-        handleBlockUpdate(blockId, JSON.stringify(tableData));
 
-        setBlocks((prev) =>
-          prev.map((b) =>
-            b.id === blockId ? { ...b, type: "table" as const } : b
-          )
-        );
+        const updatedBlock: Block = {
+          ...block,
+          type: "table",
+          content: JSON.stringify(tableData),
+        };
+
+        addBlock(updatedBlock);
+        saveToDatabase();
         return;
       }
 
@@ -179,17 +174,13 @@ export function PageEditor({ pageId }: PageEditorProps) {
       if (block && !block.content.trim() && blocks.length > 1) {
         e.preventDefault();
         const blockIndex = blocks.findIndex((b) => b.id === blockId);
-        const newBlocks = blocks.filter((b) => b.id !== blockId);
-        setBlocks(newBlocks);
         deleteBlock(blockId);
 
         if (blockIndex > 0) {
-          setSelectedBlockId(newBlocks[blockIndex - 1].id);
+          setSelectedBlockId(blocks[blockIndex - 1].id);
         }
 
-        if (page) {
-          pageApi.update(pageId, { ...page, blocks: newBlocks });
-        }
+        saveToDatabase();
       }
     }
   };
