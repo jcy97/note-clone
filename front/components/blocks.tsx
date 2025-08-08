@@ -27,6 +27,7 @@ export function TextBlock({
     y: number;
   }>({ x: 0, y: 0 });
   const ref = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (ref.current && block.content !== (ref.current.textContent || "")) {
@@ -58,14 +59,18 @@ export function TextBlock({
     if (!ref.current) return;
     const newContent = ref.current.textContent || "";
 
-    if (newContent === "/") {
+    if (newContent === "/" && !showCommandMenu) {
       const rect = ref.current.getBoundingClientRect();
-      setCommandMenuPosition({ x: rect.left, y: rect.top });
-      setShowCommandMenu(true);
-      return;
-    }
+      const containerRect = containerRef.current?.getBoundingClientRect();
+      const scrollTop =
+        window.pageYOffset || document.documentElement.scrollTop;
 
-    if (showCommandMenu) {
+      setCommandMenuPosition({
+        x: rect.left - (containerRect?.left || 0),
+        y: rect.bottom - (containerRect?.top || 0) + scrollTop,
+      });
+      setShowCommandMenu(true);
+    } else if (newContent !== "/" && showCommandMenu) {
       setShowCommandMenu(false);
     }
 
@@ -108,7 +113,7 @@ export function TextBlock({
   };
 
   return (
-    <>
+    <div ref={containerRef} className="relative">
       <div
         ref={ref}
         contentEditable
@@ -126,7 +131,7 @@ export function TextBlock({
           onClose={() => setShowCommandMenu(false)}
         />
       )}
-    </>
+    </div>
   );
 }
 

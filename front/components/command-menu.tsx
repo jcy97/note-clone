@@ -58,7 +58,7 @@ export function CommandMenu({ position, onSelect, onClose }: CommandMenuProps) {
     <div
       ref={menuRef}
       className="absolute z-50 bg-white border border-gray-200 rounded-lg shadow-lg py-2 min-w-64"
-      style={{ left: position.x, top: position.y + 20 }}
+      style={{ left: position.x, top: position.y }}
     >
       {commands.map((command, index) => (
         <div

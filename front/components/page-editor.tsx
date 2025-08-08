@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Page, Block, pageApi } from "../api";
 import { useYDoc } from "../useYDoc";
 import { TextBlock, CodeBlock, TableBlock } from "./blocks";
@@ -14,6 +14,10 @@ export function PageEditor({ pageId }: PageEditorProps) {
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
+  const [localTitle, setLocalTitle] = useState<string>("");
+  const [isComposing, setIsComposing] = useState<boolean>(false);
+  const titleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const {
     isConnected,
     updateBlock,
@@ -27,6 +31,30 @@ export function PageEditor({ pageId }: PageEditorProps) {
   useEffect(() => {
     loadPage();
   }, [pageId]);
+
+  useEffect(() => {
+    if (page) {
+      setLocalTitle(page.title);
+    }
+  }, [page]);
+
+  useEffect(() => {
+    if (titleTimeoutRef.current) {
+      clearTimeout(titleTimeoutRef.current);
+    }
+
+    if (!isComposing && localTitle !== page?.title) {
+      titleTimeoutRef.current = setTimeout(() => {
+        updateTitleInDatabase(localTitle);
+      }, 500);
+    }
+
+    return () => {
+      if (titleTimeoutRef.current) {
+        clearTimeout(titleTimeoutRef.current);
+      }
+    };
+  }, [localTitle, isComposing, page?.title]);
 
   useEffect(() => {
     if (!blocksMap) return;
@@ -57,12 +85,23 @@ export function PageEditor({ pageId }: PageEditorProps) {
     try {
       const pageData = await pageApi.getById(pageId);
       setPage(pageData);
+      setLocalTitle(pageData.title);
 
       pageData.blocks.forEach((block) => {
         addBlock(block);
       });
     } catch (error) {
       console.error("Failed to load page:", error);
+    }
+  };
+
+  const updateTitleInDatabase = async (title: string) => {
+    if (!page) return;
+    try {
+      const updatedPage = await pageApi.update(pageId, { ...page, title });
+      setPage(updatedPage);
+    } catch (error) {
+      console.error("Failed to update title:", error);
     }
   };
 
@@ -185,14 +224,16 @@ export function PageEditor({ pageId }: PageEditorProps) {
     }
   };
 
-  const updateTitle = async (title: string) => {
-    if (!page) return;
-    try {
-      const updatedPage = await pageApi.update(pageId, { ...page, title });
-      setPage(updatedPage);
-    } catch (error) {
-      console.error("Failed to update title:", error);
-    }
+  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setLocalTitle(e.target.value);
+  };
+
+  const handleCompositionStart = () => {
+    setIsComposing(true);
+  };
+
+  const handleCompositionEnd = () => {
+    setIsComposing(false);
   };
 
   if (!page) {
@@ -234,8 +275,10 @@ export function PageEditor({ pageId }: PageEditorProps) {
 
       <input
         type="text"
-        value={page.title}
-        onChange={(e) => updateTitle(e.target.value)}
+        value={localTitle}
+        onChange={handleTitleChange}
+        onCompositionStart={handleCompositionStart}
+        onCompositionEnd={handleCompositionEnd}
         placeholder="Untitled"
         className="text-4xl font-bold mb-8 w-full outline-none border-none bg-transparent placeholder-gray-400"
       />
