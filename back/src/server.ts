@@ -5,7 +5,7 @@ import cors from "cors";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 import { YSocketIO } from "y-socket.io/dist/server";
-import { pageRoutes } from "./routes/pages";
+import { createPageRoutes } from "./routes/pages";
 
 dotenv.config();
 
@@ -38,7 +38,7 @@ const ysocketio = new YSocketIO(io, {
 
 ysocketio.initialize();
 
-app.use("/api/pages", pageRoutes);
+app.use("/api/pages", createPageRoutes(io));
 
 const PORT = process.env.PORT || 3001;
 

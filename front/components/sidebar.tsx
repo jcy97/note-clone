@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Page, pageApi } from "../api";
+import { io } from "socket.io-client";
 
 interface SidebarProps {
   currentPageId?: string;
@@ -14,6 +15,27 @@ export function Sidebar({ currentPageId, onPageSelect }: SidebarProps) {
 
   useEffect(() => {
     loadPages();
+
+    const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:3001";
+    const socket = io(wsUrl);
+
+    socket.on("page-created", (newPage: Page) => {
+      setPages((prev) => [newPage, ...prev]);
+    });
+
+    socket.on("page-deleted", (deletedPageId: string) => {
+      setPages((prev) => prev.filter((p) => p._id !== deletedPageId));
+    });
+
+    socket.on("page-updated", (updatedPage: Page) => {
+      setPages((prev) =>
+        prev.map((p) => (p._id === updatedPage._id ? updatedPage : p))
+      );
+    });
+
+    return () => {
+      socket.disconnect();
+    };
   }, []);
 
   const loadPages = async () => {
@@ -31,7 +53,6 @@ export function Sidebar({ currentPageId, onPageSelect }: SidebarProps) {
   const createNewPage = async () => {
     try {
       const newPage = await pageApi.create("Untitled");
-      setPages((prev) => [newPage, ...prev]);
       onPageSelect(newPage._id);
     } catch (error) {
       console.error("Failed to create page:", error);
@@ -44,7 +65,6 @@ export function Sidebar({ currentPageId, onPageSelect }: SidebarProps) {
 
     try {
       await pageApi.delete(pageId);
-      setPages((prev) => prev.filter((p) => p._id !== pageId));
 
       if (currentPageId === pageId && pages.length > 1) {
         const remainingPages = pages.filter((p) => p._id !== pageId);

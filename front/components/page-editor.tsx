@@ -13,6 +13,7 @@ export function PageEditor({ pageId }: PageEditorProps) {
   const [page, setPage] = useState<Page | null>(null);
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
+  const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const {
     isConnected,
     updateBlock,
@@ -20,6 +21,7 @@ export function PageEditor({ pageId }: PageEditorProps) {
     addBlock,
     deleteBlock,
     blocksMap,
+    getOnlineUsers,
   } = useYDoc(pageId);
 
   useEffect(() => {
@@ -43,6 +45,15 @@ export function PageEditor({ pageId }: PageEditorProps) {
       blocksMap.unobserve(updateBlocks);
     };
   }, [blocksMap, getBlocks]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const users = getOnlineUsers();
+      setOnlineUsers(users);
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [getOnlineUsers]);
 
   const loadPage = async () => {
     try {
@@ -77,6 +88,33 @@ export function PageEditor({ pageId }: PageEditorProps) {
     },
     [updateBlock, blocks, page, pageId]
   );
+
+  const handleBlockTypeChange = (
+    blockId: string,
+    newType: "text" | "code" | "table"
+  ) => {
+    const defaultContent =
+      newType === "table" ? '{"rows":[["",""],["",""]]}' : "";
+
+    setBlocks((prev) =>
+      prev.map((block) =>
+        block.id === blockId
+          ? { ...block, type: newType, content: defaultContent }
+          : block
+      )
+    );
+
+    updateBlock(blockId, defaultContent);
+
+    if (page) {
+      const updatedBlocks = blocks.map((block) =>
+        block.id === blockId
+          ? { ...block, type: newType, content: defaultContent }
+          : block
+      );
+      pageApi.update(pageId, { ...page, blocks: updatedBlocks });
+    }
+  };
 
   const createNewBlock = (
     afterBlockId: string,
@@ -174,15 +212,33 @@ export function PageEditor({ pageId }: PageEditorProps) {
 
   return (
     <div className="max-w-4xl mx-auto p-8">
-      <div className="mb-6 flex items-center gap-4">
-        <div
-          className={`w-3 h-3 rounded-full ${
-            isConnected ? "bg-green-500" : "bg-red-500"
-          }`}
-        />
-        <span className="text-sm text-gray-500">
-          {isConnected ? "Connected" : "Disconnected"}
-        </span>
+      <div className="mb-6 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div
+            className={`w-3 h-3 rounded-full ${
+              isConnected ? "bg-green-500" : "bg-red-500"
+            }`}
+          />
+          <span className="text-sm text-gray-500">
+            {isConnected ? "Connected" : "Disconnected"}
+          </span>
+        </div>
+
+        {onlineUsers.length > 0 && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-500">Online:</span>
+            <div className="flex gap-2">
+              {onlineUsers.map((user, index) => (
+                <div
+                  key={index}
+                  className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full"
+                >
+                  {user}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <input
@@ -210,6 +266,7 @@ export function PageEditor({ pageId }: PageEditorProps) {
                   onUpdate={(content) => handleBlockUpdate(block.id, content)}
                   onKeyDown={handleKeyDown(block.id)}
                   onFocus={() => setSelectedBlockId(block.id)}
+                  onTypeChange={(type) => handleBlockTypeChange(block.id, type)}
                 />
               )}
 

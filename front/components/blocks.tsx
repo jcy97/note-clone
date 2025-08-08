@@ -1,15 +1,28 @@
 import { useState, useRef, useEffect } from "react";
 import { Block } from "../api";
+import { CommandMenu } from "./command-menu";
 
 interface BlockProps {
   block: Block;
   onUpdate: (content: string) => void;
   onKeyDown: (e: React.KeyboardEvent) => void;
   onFocus: () => void;
+  onTypeChange?: (type: "text" | "code" | "table") => void;
 }
 
-export function TextBlock({ block, onUpdate, onKeyDown, onFocus }: BlockProps) {
+export function TextBlock({
+  block,
+  onUpdate,
+  onKeyDown,
+  onFocus,
+  onTypeChange,
+}: BlockProps) {
   const [content, setContent] = useState(block.content);
+  const [showCommandMenu, setShowCommandMenu] = useState(false);
+  const [commandMenuPosition, setCommandMenuPosition] = useState({
+    x: 0,
+    y: 0,
+  });
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -23,12 +36,29 @@ export function TextBlock({ block, onUpdate, onKeyDown, onFocus }: BlockProps) {
     if (!ref.current) return;
     const newContent = ref.current.textContent || "";
     setContent(newContent);
+
+    if (newContent === "/") {
+      const rect = ref.current.getBoundingClientRect();
+      setCommandMenuPosition({ x: rect.left, y: rect.top });
+      setShowCommandMenu(true);
+      return;
+    }
+
+    if (showCommandMenu) {
+      setShowCommandMenu(false);
+    }
+
     onUpdate(newContent);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (!ref.current) return;
+    if (showCommandMenu) {
+      if (["ArrowUp", "ArrowDown", "Enter", "Escape"].includes(e.key)) {
+        return;
+      }
+    }
 
+    if (!ref.current) return;
     const text = ref.current.textContent || "";
 
     if (text.startsWith("```") && e.key === "Enter") {
@@ -46,17 +76,35 @@ export function TextBlock({ block, onUpdate, onKeyDown, onFocus }: BlockProps) {
     onKeyDown(e);
   };
 
+  const handleCommandSelect = (type: "text" | "code" | "table") => {
+    if (ref.current) {
+      ref.current.textContent = "";
+    }
+    setContent("");
+    setShowCommandMenu(false);
+    onTypeChange?.(type);
+  };
+
   return (
-    <div
-      ref={ref}
-      contentEditable
-      className="min-h-[1.5rem] p-2 rounded hover:bg-gray-50 focus:bg-white outline-none"
-      data-placeholder="Type '/' for commands, '```' for code, '|' for table..."
-      onInput={handleInput}
-      onKeyDown={handleKeyDown}
-      onFocus={onFocus}
-      suppressContentEditableWarning
-    />
+    <>
+      <div
+        ref={ref}
+        contentEditable
+        className="min-h-[1.5rem] p-2 rounded hover:bg-gray-50 focus:bg-white outline-none"
+        data-placeholder="Type '/' for commands, '```' for code, '|' for table..."
+        onInput={handleInput}
+        onKeyDown={handleKeyDown}
+        onFocus={onFocus}
+        suppressContentEditableWarning
+      />
+      {showCommandMenu && (
+        <CommandMenu
+          position={commandMenuPosition}
+          onSelect={handleCommandSelect}
+          onClose={() => setShowCommandMenu(false)}
+        />
+      )}
+    </>
   );
 }
 
@@ -143,7 +191,7 @@ export function TableBlock({
 
   const addColumn = () => {
     const newTableData = { ...tableData };
-    newTableData.rows.forEach((row) => row.push(""));
+    newTableData.rows.forEach((row: any) => row.push(""));
     setTableData(newTableData);
     onUpdate(JSON.stringify(newTableData));
   };
