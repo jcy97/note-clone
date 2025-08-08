@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
+    sans-serif;
+}
+
+[contenteditable]:empty:before {
+  content: attr(data-placeholder);
+  color: #9ca3af;
+}
+
+[contenteditable]:focus {
+  outline: none;
+}
+
+.block-selector {
+  border: 2px dashed #e5e7eb;
+  transition: all 0.2s;
+}
+
+.block-selector:hover {
+  border-color: #3b82f6;
+  background-color: #f8fafc;
+}
+
+.prose {
+  max-width: none;
+}
+
+code {
+  background: #f1f5f9;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-family: "SF Mono", Monaco, "Cascadia Code", monospace;
+}
+
+pre {
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 16px;
+  border-radius: 8px;
+  overflow-x: auto;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+table td,
+table th {
+  border: 1px solid #e5e7eb;
+  padding: 8px 12px;
+}
+
+table th {
+  background: #f8fafc;
+  font-weight: 600;
+}
