@@ -4,11 +4,8 @@ import { SocketIOProvider } from "y-socket.io";
 import { Block } from "./api";
 
 const generateUserName = () => {
-  const colors = ["Red", "Blue", "Green", "Purple", "Orange", "Pink", "Yellow"];
-  const animals = ["Cat", "Dog", "Fox", "Bear", "Lion", "Tiger", "Wolf"];
-  const color = colors[Math.floor(Math.random() * colors.length)];
-  const animal = animals[Math.floor(Math.random() * animals.length)];
-  return `${color} ${animal}`;
+  const userNumber = Math.floor(Math.random() * 1000) + 1;
+  return `user${userNumber}`;
 };
 
 export function useYDoc(pageId: string) {
